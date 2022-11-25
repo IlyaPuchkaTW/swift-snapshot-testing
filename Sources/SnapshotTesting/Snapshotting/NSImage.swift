@@ -108,6 +108,7 @@ private func compare(_ old: NSImage, _ new: NSImage, precision: Float, perceptua
       if oldRep[offset] != newRep[offset] {
         differentByteCount += 1
       }
+      return differentByteCount <= byteCountThreshold
     }
     if differentByteCount > byteCountThreshold {
       let actualPrecision = 1 - Float(differentByteCount) / Float(byteCount)

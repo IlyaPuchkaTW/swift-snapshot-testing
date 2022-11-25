@@ -127,6 +127,7 @@ private func compare(_ old: UIImage, _ new: UIImage, precision: Float, perceptua
       if oldBytes[offset] != newerBytes[offset] {
         differentByteCount += 1
       }
+      return differentByteCount <= byteCountThreshold
     }
     if differentByteCount > byteCountThreshold {
       let actualPrecision = 1 - Float(differentByteCount) / Float(byteCount)
@@ -186,6 +187,7 @@ func perceptuallyCompare(_ old: CIImage, _ new: CIImage, pixelPrecision: Float, 
   let deltaThreshold = (1 - perceptualPrecision) * 100
   var failingPixelCount: Int = 0
   var maximumDeltaE: Float = 0
+  let maxFailingPixelCountAllowed = Float(1 - pixelPrecision) * Float(deltaOutputImage.extent.width * deltaOutputImage.extent.height)
   // rowBytes must be a multiple of 8, so vImage_Buffer pads the end of each row with bytes to meet the multiple of 0 requirement.
   // We must do 2D iteration of the vImage_Buffer in order to avoid loading the padding garbage bytes at the end of each row.
   fastForEach(in: 0..<Int(buffer.height)) { line in
@@ -197,7 +199,9 @@ func perceptuallyCompare(_ old: CIImage, _ new: CIImage, pixelPrecision: Float, 
         failingPixelCount += 1
       }
       maximumDeltaE = max(maximumDeltaE, deltaE)
+      return Float(failingPixelCount) <= maxFailingPixelCountAllowed
     }
+    return Float(failingPixelCount) <= maxFailingPixelCountAllowed
   }
   let failingPixelPercent = Float(failingPixelCount) / Float(deltaOutputImage.extent.width * deltaOutputImage.extent.height)
   let actualPixelPrecision = 1 - failingPixelPercent
@@ -236,10 +240,12 @@ extension CIImage {
 
 /// When the compiler doesn't have optimizations enabled, like in test targets, a `while` loop is significantly faster than a `for` loop
 /// for iterating through the elements of a memory buffer. Details can be found in [SR-6983](https://github.com/apple/swift/issues/49531#issuecomment-1108286654)
-func fastForEach(in range: Range<Int>, _ body: (Int) -> Void) {
+func fastForEach(in range: Range<Int>, _ body: (Int) -> Bool) {
   var index = range.lowerBound
   while index < range.upperBound {
-    body(index)
+    guard body(index) else {
+      return
+    }
     index += 1
   }
 }
