@@ -170,21 +170,23 @@ private func diff(_ old: UIImage, _ new: UIImage) -> UIImage {
 
 #if os(iOS) || os(tvOS) || os(macOS)
 import CoreImage.CIKernel
-import MetalPerformanceShaders
+//import MetalPerformanceShaders
 
 @available(iOS 10.0, tvOS 10.0, macOS 10.13, *)
 func perceptuallyCompare(_ old: CIImage, _ new: CIImage, pixelPrecision: Float, perceptualPrecision: Float) -> String? {
   let deltaOutputImage = old.applyingFilter("CILabDeltaE", parameters: ["inputImage2": new])
   let thresholdOutputImage: CIImage
-  do {
-    thresholdOutputImage = try ThresholdImageProcessorKernel.apply(
-      withExtent: new.extent,
-      inputs: [deltaOutputImage],
-      arguments: [ThresholdImageProcessorKernel.inputThresholdKey: (1 - perceptualPrecision) * 100]
-    )
-  } catch {
-    return "Newly-taken snapshot's data could not be loaded. \(error)"
-  }
+//  do {
+//    thresholdOutputImage = try ThresholdImageProcessorKernel.apply(
+//      withExtent: new.extent,
+//      inputs: [deltaOutputImage],
+//      arguments: [ThresholdImageProcessorKernel.inputThresholdKey: (1 - perceptualPrecision) * 100]
+//    )
+//  } catch {
+//    return "Newly-taken snapshot's data could not be loaded. \(error)"
+//  }
+  thresholdOutputImage = deltaOutputImage.applyingFilter("CIColorThreshold", parameters: ["inputThreshold": (1 - perceptualPrecision) * 100])
+
   var averagePixel: Float = 0
   let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull()])
   context.render(
@@ -218,36 +220,36 @@ func perceptuallyCompare(_ old: CIImage, _ new: CIImage, pixelPrecision: Float, 
 }
 
 // Copied from https://developer.apple.com/documentation/coreimage/ciimageprocessorkernel
-@available(iOS 10.0, tvOS 10.0, macOS 10.13, *)
-final class ThresholdImageProcessorKernel: CIImageProcessorKernel {
-  static let inputThresholdKey = "thresholdValue"
-  static let device = MTLCreateSystemDefaultDevice()
-
-  override class func process(with inputs: [CIImageProcessorInput]?, arguments: [String: Any]?, output: CIImageProcessorOutput) throws {
-    guard
-      let device = device,
-      let commandBuffer = output.metalCommandBuffer,
-      let input = inputs?.first,
-      let sourceTexture = input.metalTexture,
-      let destinationTexture = output.metalTexture,
-      let thresholdValue = arguments?[inputThresholdKey] as? Float else {
-      return
-    }
-
-    let threshold = MPSImageThresholdBinary(
-      device: device,
-      thresholdValue: thresholdValue,
-      maximumValue: 1.0,
-      linearGrayColorTransform: nil
-    )
-
-    threshold.encode(
-      commandBuffer: commandBuffer,
-      sourceTexture: sourceTexture,
-      destinationTexture: destinationTexture
-    )
-  }
-}
+//@available(iOS 10.0, tvOS 10.0, macOS 10.13, *)
+//final class ThresholdImageProcessorKernel: CIImageProcessorKernel {
+//  static let inputThresholdKey = "thresholdValue"
+//  static let device = MTLCreateSystemDefaultDevice()
+//
+//  override class func process(with inputs: [CIImageProcessorInput]?, arguments: [String: Any]?, output: CIImageProcessorOutput) throws {
+//    guard
+//      let device = device,
+//      let commandBuffer = output.metalCommandBuffer,
+//      let input = inputs?.first,
+//      let sourceTexture = input.metalTexture,
+//      let destinationTexture = output.metalTexture,
+//      let thresholdValue = arguments?[inputThresholdKey] as? Float else {
+//      return
+//    }
+//
+//    let threshold = MPSImageThresholdBinary(
+//      device: device,
+//      thresholdValue: thresholdValue,
+//      maximumValue: 1.0,
+//      linearGrayColorTransform: nil
+//    )
+//
+//    threshold.encode(
+//      commandBuffer: commandBuffer,
+//      sourceTexture: sourceTexture,
+//      destinationTexture: destinationTexture
+//    )
+//  }
+//}
 #endif
 
 /// When the compiler doesn't have optimizations enabled, like in test targets, a `while` loop is significantly faster than a `for` loop
